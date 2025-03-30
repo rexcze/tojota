@@ -314,8 +314,31 @@ class Myt:
             'odometer': data['odometer']['value'],
             'hv_percentage': data['fuelLevel'],
             'hv_range': data['distanceToEmpty']['value'],
-            'ev_percentage': data['batteryLevel'],
             'timestamp': data['timestamp'],
+        }
+        return telemetry, fresh
+    
+    def get_ev_telemetry(self):
+        """
+        Get EV related stats
+        :return: dict(ev_percentage, timestamp, charging_status), fresh
+        """
+        fresh = False
+        ev_stats_path = Path(CACHE_DIR) / 'ev_stats'
+        ev_stats_file = ev_stats_path / 'ev_stats-{}'.format(pendulum.now())
+        url = f'{MYT_API_URL}/v3/telemetry'
+        r = requests.get(url, headers=self.headers)
+
+        if r.status_code != 200:
+            raise ValueError('Failed to get data {} {} {}'.format(r.text, r.status_code, r.headers))
+        os.makedirs(ev_stats_path, exist_ok=True)
+        previous_ev_stats = self._read_file(self._find_latest_file(str(ev_stats_path / 'ev_stats*')))
+        if r.text != previous_ev_stats:
+            self._write_file(ev_stats_file, r.text)
+            fresh = True
+        data = r.json()['payload']
+        telemetry = {
+            'ev_percentage': data['batteryLevel'],
             'charging_status': data['chargingStatus'],
         }
         return telemetry, fresh
@@ -507,14 +530,25 @@ def main():
     try:
         telemetry, fresh = myt.get_telemetry()
         print('Odometer {} km, {}% fuel left'.format(telemetry['odometer'], telemetry['hv_percentage']))
-        print('EV {}%, status: {} at {}'.format(telemetry['ev_percentage'], telemetry['charging_status'],
-                                                pendulum.parse(telemetry['timestamp']).in_tz(myt.config_data['timezone']).to_datetime_string()))
+        # print('EV {}%, status: {} at {}'.format(telemetry['ev_percentage'], telemetry['charging_status'],
+                                                # pendulum.parse(telemetry['timestamp']).in_tz(myt.config_data['timezone']).to_datetime_string()))
         odometer_to_db(myt, fresh, telemetry['hv_percentage'], telemetry['odometer'])
     except ValueError:
         print('Didn\'t get odometer information!')
 
-    # Get remote control status
+    # Get EV stats
     if myt.config_data['use_remote_control']:
+        log.info('Get EV info...')
+        try:
+            telemetry, fresh = myt.get_ev_telemetry()
+            print('EV {}%, status: {} at {}'.format(telemetry['ev_percentage'], telemetry['charging_status'],
+                                                    pendulum.parse(telemetry['timestamp']).in_tz(myt.config_data['timezone']).to_datetime_string()))
+            # odometer_to_db(myt, fresh, telemetry['hv_percentage'], telemetry['odometer'])
+        except ValueError:
+            print('Didn\'t get EV information!')
+
+    # Get remote control status
+    if myt.config_data['is_electric']:
         log.info('Get remote control status...')
         status, fresh = myt.get_remote_control_status()
 

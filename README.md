@@ -26,7 +26,7 @@ Unofficial python functions for handling data from Toyota Connected services API
 - If your vehicle doesn't support remote control functions, set `"use_remote_control": false` in the config file
 - If your vehicle is not EV (or does not charge), set `"is_electric": false` in the config file
 - If you would like to save data to InfluxDB, install InfluxDB ( https://www.influxdata.com/ ) and create database
-  'tojota' and set "use_influxdb": true in the config file (support only for old unsecure no authentication version)
+  'tojota' and set `"use_influxdb": true` in the config file (support only for old unsecure no authentication version)
 - Run `python tojota.py` to fetch, save and print data
 - Data is saved to cache directory for further usage
 
